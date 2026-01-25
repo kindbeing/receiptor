@@ -119,142 +119,23 @@ _Add any setup issues or environment notes here_
 ## PHASE 1: CORE INFRASTRUCTURE
 
 ### TASK 1: Invoice Upload & Storage + Complete Database Schema
-**Status**: `TODO`  
+**Status**: `DONE` ✅  
 **Owner**: Agent 1  
-**Depends On**: SETUP  
-**Blocks**: TASK 2A, TASK 2B, TASK 4, TASK 5
+**Completed**: 2026-01-25
 
-#### Deliverables:
-1. **Database Migration** (create ALL tables, not just invoices):
-```sql
--- Agent 1: Create this complete schema in one migration
+#### Implemented:
+- [x] Migration `20260125_complete_invoice_schema.py` - All 8 tables created
+- [x] `backend/models.py` - SQLAlchemy models with relationships
+- [x] `backend/schemas.py` - Pydantic schemas (ExtractionResult API contract)
+- [x] `backend/services/invoice_storage_service.py` - File upload handling
+- [x] `backend/routers/invoices.py` - Upload, get, list, delete endpoints
+- [x] `backend/seed_data.sql` - 8 subcontractors + 16 cost codes
+- [x] `frontend/src/components/InvoiceUploadForm.tsx` - Drag & drop UI
+- [x] `frontend/src/types/invoice.ts` - TypeScript types
+- [x] `frontend/src/services/invoiceApi.ts` - API client
+- [x] Test builder_id: `00000000-0000-0000-0000-000000000001`
 
--- Core invoice storage
-CREATE TABLE invoices (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    filename VARCHAR(255) NOT NULL,
-    file_path VARCHAR(512) NOT NULL,
-    builder_id UUID NOT NULL,
-    uploaded_at TIMESTAMP DEFAULT NOW(),
-    status VARCHAR(50) DEFAULT 'uploaded',
-    processing_method VARCHAR(50),  -- 'traditional' or 'vision'
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Extraction results (stores output from TASK 2A/2B)
-CREATE TABLE extracted_fields (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
-    vendor_name VARCHAR(255),
-    invoice_number VARCHAR(100),
-    invoice_date DATE,
-    total_amount DECIMAL(10, 2),
-    confidence DECIMAL(3, 2),  -- 0.00 to 1.00
-    raw_json JSONB,  -- Full extraction result
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Subcontractor master list (for TASK 4)
-CREATE TABLE subcontractors (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    builder_id UUID NOT NULL,
-    contact_info JSONB,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Vendor matching results (TASK 4)
-CREATE TABLE vendor_matches (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
-    subcontractor_id UUID REFERENCES subcontractors(id),
-    match_score INTEGER,  -- 0-100
-    confirmed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Cost code master list (for TASK 5)
-CREATE TABLE cost_codes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR(50) NOT NULL,
-    label VARCHAR(255) NOT NULL,
-    description TEXT,
-    builder_id UUID NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Line items extracted from invoices (TASK 2A/2B)
-CREATE TABLE line_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
-    description TEXT NOT NULL,
-    quantity DECIMAL(10, 2),
-    unit_price DECIMAL(10, 2),
-    amount DECIMAL(10, 2) NOT NULL,
-    suggested_code VARCHAR(50),
-    confidence DECIMAL(3, 2),
-    confirmed_code VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Human corrections tracking (TASK 6)
-CREATE TABLE correction_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
-    field_name VARCHAR(100),
-    old_value TEXT,
-    new_value TEXT,
-    reviewer_id UUID,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Performance tracking (TASK 3)
-CREATE TABLE processing_metrics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
-    method VARCHAR(50),  -- 'traditional' or 'vision'
-    processing_time_ms INTEGER,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-2. **Backend Files** (Agent 1 creates):
-   - `backend/models.py` - SQLAlchemy models for ALL tables above
-   - `backend/services/invoice_storage_service.py` - Upload + file handling
-   - `backend/routers/invoices.py` - Add `POST /api/invoices/upload` endpoint
-   - `backend/alembic/versions/XXXXX_complete_schema.py` - Migration file
-
-3. **Frontend Component** (Agent 1 creates):
-   - `frontend/src/components/InvoiceUploadForm.tsx` - Drag & drop upload
-   - `frontend/src/types/invoice.ts` - TypeScript interfaces matching API contracts
-   - `frontend/src/services/invoiceApi.ts` - API client wrapper
-
-4. **Seed Data** (Agent 1 creates for testing):
-   - `backend/seed_data.sql` - Insert test subcontractors and cost codes
-```sql
--- Example seed data for Agent 2 to test with
-INSERT INTO subcontractors (name, builder_id) VALUES
-    ('ABC Plumbing LLC', '00000000-0000-0000-0000-000000000001'),
-    ('Smith Electric Inc', '00000000-0000-0000-0000-000000000001'),
-    ('Johnson HVAC Services', '00000000-0000-0000-0000-000000000001');
-
-INSERT INTO cost_codes (code, label, description, builder_id) VALUES
-    ('15140', 'Plumbing - Rough-in', 'Install pipes and fixtures', '00000000-0000-0000-0000-000000000001'),
-    ('16050', 'Electrical - Wiring', 'Install electrical wiring', '00000000-0000-0000-0000-000000000001'),
-    ('23000', 'HVAC - Installation', 'Install heating and cooling systems', '00000000-0000-0000-0000-000000000001');
-```
-
-#### Verification Checklist:
-- [ ] Database migration runs successfully
-- [ ] All tables created with correct schema
-- [ ] Upload endpoint returns invoice_id
-- [ ] Files saved to `/uploads/{invoice_id}/original.{ext}`
-- [ ] Frontend can upload PDF/JPG/PNG
-- [ ] Seed data inserted successfully
-
-**Completion Timestamp**: _Agent 1 adds when done_  
-**Notes**:
-_Agent 1: Add any implementation notes, gotchas, or decisions made_
+**Agent 2 UNBLOCKED** - Can start TASK 2B, 5, 3
 
 ---
 
@@ -637,7 +518,8 @@ _Agent 1: Add review UI/UX decisions, validation rules, etc._
 ## 📝 AGENT NOTES & COMMUNICATION
 
 ### Agent 1 Notes:
-_Add blockers, questions, or updates here_
+- 2026-01-25: ✅ TASK 1 DONE - Agent 2 unblocked
+- Next: TASK 2A (Traditional OCR), TASK 4 (Vendor Matching), TASK 6 (Review Workflow)
 
 ---
 

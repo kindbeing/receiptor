@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.receipts import router as receipts_router
+from routers.invoices import router as invoices_router
 
 app = FastAPI()
 
@@ -13,6 +14,7 @@ app.add_middleware(
 )
 
 app.include_router(receipts_router)
+app.include_router(invoices_router)
 
 @app.get("/")
 def main():
