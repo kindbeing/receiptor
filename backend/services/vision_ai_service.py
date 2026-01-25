@@ -8,7 +8,7 @@ from schemas import ExtractionResult, ExtractedFieldsBase, LineItemBase
 
 
 class VisionAIService:
-    def __init__(self, model: str = "qwen2-vl:7b"):
+    def __init__(self, model: str = "qwen2.5vl:7b"):
         self.model = model
         
     def process(self, invoice_path: str) -> ExtractionResult:

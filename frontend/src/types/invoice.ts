@@ -108,3 +108,19 @@ export interface ProcessingMetric {
   created_at: string;
 }
 
+export interface MatchCandidate {
+  subcontractor_id: string;
+  subcontractor_name: string;
+  score: number;
+  confidence_level: 'high' | 'auto_approve' | 'review' | 'low';
+  contact_info?: any;
+}
+
+export interface VendorMatchResult {
+  invoice_id: string;
+  extracted_vendor: string;
+  matches: MatchCandidate[];
+  status: InvoiceStatus;
+  message: string;
+}
+

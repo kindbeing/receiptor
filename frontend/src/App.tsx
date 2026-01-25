@@ -3,6 +3,7 @@ import ReceiptsTable from './components/ReceiptsTable'
 import InvoiceUploadForm from './components/InvoiceUploadForm'
 import { TraditionalOCRProcessor } from './components/TraditionalOCRProcessor'
 import { VisionAIProcessor } from './components/VisionAIProcessor'
+import { VendorMatcher } from './components/VendorMatcher'
 import type { Invoice, ExtractionResult } from './types/invoice'
 import './App.css'
 
@@ -28,6 +29,26 @@ function App() {
       )
     )
   }
+
+  const handleMatchComplete = () => {
+    // Refresh invoice list to show updated status
+    console.log('Vendor matching complete')
+    // Update invoice status in the list
+    if (selectedInvoiceId) {
+      setUploadedInvoices(prev => 
+        prev.map(inv => 
+          inv.id === selectedInvoiceId 
+            ? { ...inv, status: 'matched' }
+            : inv
+        )
+      )
+    }
+  }
+
+  // Check if selected invoice has been extracted
+  const selectedInvoice = uploadedInvoices.find(inv => inv.id === selectedInvoiceId)
+  const showVendorMatcher = selectedInvoice && 
+    ['extracted', 'matched', 'classified', 'needs_review'].includes(selectedInvoice.status)
 
   return (
     <div className="app">
@@ -81,16 +102,25 @@ function App() {
 
             <div className="invoices-right">
               {selectedInvoiceId ? (
-                <div className="processors-grid">
-                  <TraditionalOCRProcessor 
-                    invoiceId={selectedInvoiceId}
-                    onExtractionComplete={handleExtractionComplete}
-                  />
-                  <VisionAIProcessor 
-                    invoiceId={selectedInvoiceId}
-                    onExtractionComplete={handleExtractionComplete}
-                  />
-                </div>
+                <>
+                  <div className="processors-grid">
+                    <TraditionalOCRProcessor 
+                      invoiceId={selectedInvoiceId}
+                      onExtractionComplete={handleExtractionComplete}
+                    />
+                    <VisionAIProcessor 
+                      invoiceId={selectedInvoiceId}
+                      onExtractionComplete={handleExtractionComplete}
+                    />
+                  </div>
+                  
+                  {showVendorMatcher && (
+                    <VendorMatcher 
+                      invoiceId={selectedInvoiceId}
+                      onMatchComplete={handleMatchComplete}
+                    />
+                  )}
+                </>
               ) : (
                 <div className="no-selection">
                   <p>👈 Upload an invoice or select one from the list to process</p>

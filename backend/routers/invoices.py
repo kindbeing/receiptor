@@ -11,6 +11,8 @@ from schemas import InvoiceUploadResponse, InvoiceDetailResponse, ExtractionResu
 from services.invoice_storage_service import storage_service
 from services.vision_ai_service import vision_service
 from services.traditional_ocr_service import TraditionalOCRService
+from services.vendor_matching_service import VendorMatchingService, MatchCandidate
+from crud import create_vendor_match, update_invoice_status, get_invoice as crud_get_invoice
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
@@ -343,4 +345,98 @@ async def extract_vision(
         invoice.status = "uploaded"
         await db.commit()
         raise HTTPException(status_code=500, detail=f"Vision extraction failed: {str(e)}")
+
+
+@router.post("/{invoice_id}/match-vendor")
+async def match_vendor(
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Match extracted vendor name to known subcontractors using fuzzy matching.
+    
+    Args:
+        invoice_id: UUID of the invoice
+        db: Database session
+    
+    Returns:
+        Top 3 match candidates with scores, or flag for "Add New Vendor"
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    # Get invoice
+    invoice = await crud_get_invoice(db, invoice_uuid)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Check if invoice has been extracted
+    if invoice.status not in ["extracted", "matched", "classified"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Invoice must be extracted before vendor matching"
+        )
+    
+    # Get extracted vendor name
+    result = await db.execute(
+        select(ExtractedField).where(ExtractedField.invoice_id == invoice_uuid)
+    )
+    extracted_field = result.scalars().first()
+    
+    if not extracted_field or not extracted_field.vendor_name:
+        raise HTTPException(
+            status_code=400,
+            detail="No vendor name found in extracted data"
+        )
+    
+    # Perform fuzzy matching
+    vendor_matching_service = VendorMatchingService(db)
+    matches = await vendor_matching_service.match(
+        extracted_vendor=extracted_field.vendor_name,
+        builder_id=invoice.builder_id,
+        limit=3
+    )
+    
+    # If we have a high-confidence match (score >= 85), save it to database
+    if matches and matches[0].score >= 85:
+        top_match = matches[0]
+        await create_vendor_match(
+            db=db,
+            invoice_id=invoice.id,
+            subcontractor_id=top_match.subcontractor_id,
+            match_score=top_match.score,
+            confirmed=False  # Will be confirmed by user or automatically
+        )
+        
+        # Update invoice status to 'matched' or 'needs_review'
+        if top_match.score >= 90:
+            await update_invoice_status(db, invoice.id, "matched")
+            status = "matched"
+        else:
+            await update_invoice_status(db, invoice.id, "needs_review")
+            status = "needs_review"
+    else:
+        # Low confidence or no matches - needs review
+        await update_invoice_status(db, invoice.id, "needs_review")
+        status = "needs_review"
+    
+    # Return match results
+    return {
+        "invoice_id": str(invoice.id),
+        "extracted_vendor": extracted_field.vendor_name,
+        "matches": [
+            {
+                "subcontractor_id": str(m.subcontractor_id),
+                "subcontractor_name": m.subcontractor_name,
+                "score": m.score,
+                "confidence_level": vendor_matching_service.get_confidence_level(m.score),
+                "contact_info": m.contact_info
+            }
+            for m in matches
+        ],
+        "status": status,
+        "message": "High confidence match" if status == "matched" else "Review required"
+    }
 

@@ -1,5 +1,5 @@
 // Invoice API Service
-import type { Invoice, InvoiceDetail, ExtractionResult } from '../types/invoice';
+import type { Invoice, InvoiceDetail, ExtractionResult, VendorMatchResult } from '../types/invoice';
 
 const API_BASE_URL = 'http://localhost:8000/api/invoices';
 
@@ -110,6 +110,22 @@ export const invoiceApi = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to extract invoice with Vision AI');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Match extracted vendor to known subcontractors
+   */
+  async matchVendor(invoiceId: string): Promise<VendorMatchResult> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/match-vendor`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to match vendor');
     }
 
     return response.json();
