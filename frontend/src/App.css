@@ -172,3 +172,15 @@
   min-width: 100px;
   text-align: right;
 }
+
+.processors-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1400px) {
+  .processors-grid {
+    grid-template-columns: 1fr;
+  }
+}

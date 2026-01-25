@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ReceiptsTable from './components/ReceiptsTable'
 import InvoiceUploadForm from './components/InvoiceUploadForm'
 import { TraditionalOCRProcessor } from './components/TraditionalOCRProcessor'
+import { VisionAIProcessor } from './components/VisionAIProcessor'
 import type { Invoice, ExtractionResult } from './types/invoice'
 import './App.css'
 
@@ -22,7 +23,7 @@ function App() {
     setUploadedInvoices(prev => 
       prev.map(inv => 
         inv.id === result.invoice_id 
-          ? { ...inv, status: 'extracted', processing_method: 'traditional' }
+          ? { ...inv, status: 'extracted', processing_method: result.processing_method }
           : inv
       )
     )
@@ -80,10 +81,16 @@ function App() {
 
             <div className="invoices-right">
               {selectedInvoiceId ? (
-                <TraditionalOCRProcessor 
-                  invoiceId={selectedInvoiceId}
-                  onExtractionComplete={handleExtractionComplete}
-                />
+                <div className="processors-grid">
+                  <TraditionalOCRProcessor 
+                    invoiceId={selectedInvoiceId}
+                    onExtractionComplete={handleExtractionComplete}
+                  />
+                  <VisionAIProcessor 
+                    invoiceId={selectedInvoiceId}
+                    onExtractionComplete={handleExtractionComplete}
+                  />
+                </div>
               ) : (
                 <div className="no-selection">
                   <p>👈 Upload an invoice or select one from the list to process</p>
