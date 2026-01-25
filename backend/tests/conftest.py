@@ -7,8 +7,12 @@ from httpx import AsyncClient, ASGITransport
 
 os.environ["DATABASE_URL"] = "postgresql+asyncpg://root:password@localhost:5432/receiptor_testdb"
 
-from ..database import Base, get_db
-from ..main import app
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from database import Base, get_db
+from main import app
 
 TEST_DATABASE_URL = "postgresql+asyncpg://root:password@localhost:5432/receiptor_testdb"
 

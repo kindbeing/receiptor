@@ -13,3 +13,4 @@
    - Executing database migrations without explicit user approval and confirmation
    - Making any changes to the application infrastructure or configuration
 3. FIRST response from the agent reading to the user should be a vow to abide by these rules!!
+4. Compile and scan for ts/build warnings and run tests if present before marking something as done.

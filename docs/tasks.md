@@ -1,0 +1,650 @@
+# Invoice Automation System - Agent Task Coordination
+
+> **LIVING DOCUMENT**: Agents MUST update status markers after completing each task.
+> **Last Updated**: 2026-01-25
+
+---
+
+## 🤝 COORDINATION RULES (READ FIRST)
+
+### For Both Agents
+1. **Update This Document**: When you start a task, change status from `TODO` to `IN_PROGRESS`. When complete, change to `DONE` and add completion timestamp.
+2. **Check Dependencies**: Before starting, verify all "Depends On" tasks are `DONE`.
+3. **Respect Ownership**: Do NOT modify files owned by the other agent unless coordinating.
+4. **Build Failures**:
+   - If tests/build fail AFTER your changes → Fix immediately
+   - If tests/build fail BEFORE your changes → Wait patiently, add note in document, notify other agent
+5. **API Contracts**: Defined below. Do NOT change without mutual agreement.
+6. **Commit Messages**: Prefix with `[AGENT-1]` or `[AGENT-2]` so we can track who did what.
+
+### Communication Protocol
+- **Blocked?** Add `⚠️ BLOCKED: reason` to your task status
+- **Question?** Add `❓ QUESTION: your question` to task notes
+- **Change Request?** Add `🔄 CHANGE_REQUEST: description` if you need the other agent to modify something
+
+---
+
+## 📋 API CONTRACTS (DO NOT CHANGE WITHOUT AGREEMENT)
+
+### Extraction Result Schema (Used by both agents)
+```typescript
+interface ExtractionResult {
+  invoice_id: string;
+  processing_method: "traditional" | "vision";
+  extraction_status: "success" | "partial" | "failed";
+  fields: {
+    vendor_name: string | null;
+    invoice_number: string | null;
+    invoice_date: string | null;  // ISO 8601 format
+    total_amount: number | null;
+  };
+  line_items: Array<{
+    description: string;
+    quantity: number | null;
+    unit_price: number | null;
+    total: number;
+  }>;
+  confidence: number;  // 0.0 to 1.0
+  processing_time_ms: number;
+  raw_output?: any;  // For debugging
+  created_at: string;  // ISO 8601
+}
+```
+
+### Database Status Values
+```python
+InvoiceStatus = Literal[
+    "uploaded",           # Initial state after TASK 1
+    "processing",         # During extraction
+    "extracted",          # After TASK 2A or 2B
+    "matched",            # After TASK 4
+    "classified",         # After TASK 5
+    "needs_review",       # Low confidence (<85%)
+    "approved",           # Human approved
+    "rejected"            # Human rejected
+]
+```
+
+---
+
+## 📊 TASK STATUS LEGEND
+- `TODO` - Not started
+- `IN_PROGRESS` - Currently being worked on (add agent name + start time)
+- `DONE` - Completed (add completion timestamp)
+- `BLOCKED` - Waiting on dependency or other agent
+
+---
+
+## PHASE 0: FOUNDATION
+
+### SETUP: Environment Preparation
+**Status**: `TODO`  
+**Owner**: Agent 1 (lead), Agent 2 (assist)  
+**Depends On**: None  
+**Blocks**: Everything else
+
+#### Agent 1 Tasks:
+```bash
+# Backend setup
+cd backend
+pip install --break-system-packages pytesseract pdf2image pillow rapidfuzz sentence-transformers ollama pydantic python-multipart aiofiles
+brew install tesseract poppler
+
+# Frontend setup
+cd frontend
+npm install react-dropzone lucide-react recharts
+```
+
+#### Agent 2 Tasks:
+```bash
+# Ollama setup (can run in parallel)
+brew install ollama
+ollama pull qwen2-vl:7b
+ollama pull llama3.1:8b  # backup option
+
+# Verify Ollama is running
+ollama list
+```
+
+#### Verification:
+- [ ] Agent 1: `pytesseract --version` works
+- [ ] Agent 2: `ollama list` shows qwen2-vl:7b
+- [ ] Both: `npm run dev` (frontend) and backend server start without errors
+
+**Notes**:
+_Add any setup issues or environment notes here_
+
+---
+
+## PHASE 1: CORE INFRASTRUCTURE
+
+### TASK 1: Invoice Upload & Storage + Complete Database Schema
+**Status**: `TODO`  
+**Owner**: Agent 1  
+**Depends On**: SETUP  
+**Blocks**: TASK 2A, TASK 2B, TASK 4, TASK 5
+
+#### Deliverables:
+1. **Database Migration** (create ALL tables, not just invoices):
+```sql
+-- Agent 1: Create this complete schema in one migration
+
+-- Core invoice storage
+CREATE TABLE invoices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filename VARCHAR(255) NOT NULL,
+    file_path VARCHAR(512) NOT NULL,
+    builder_id UUID NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT NOW(),
+    status VARCHAR(50) DEFAULT 'uploaded',
+    processing_method VARCHAR(50),  -- 'traditional' or 'vision'
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Extraction results (stores output from TASK 2A/2B)
+CREATE TABLE extracted_fields (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+    vendor_name VARCHAR(255),
+    invoice_number VARCHAR(100),
+    invoice_date DATE,
+    total_amount DECIMAL(10, 2),
+    confidence DECIMAL(3, 2),  -- 0.00 to 1.00
+    raw_json JSONB,  -- Full extraction result
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Subcontractor master list (for TASK 4)
+CREATE TABLE subcontractors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    builder_id UUID NOT NULL,
+    contact_info JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Vendor matching results (TASK 4)
+CREATE TABLE vendor_matches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+    subcontractor_id UUID REFERENCES subcontractors(id),
+    match_score INTEGER,  -- 0-100
+    confirmed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Cost code master list (for TASK 5)
+CREATE TABLE cost_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(50) NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    description TEXT,
+    builder_id UUID NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Line items extracted from invoices (TASK 2A/2B)
+CREATE TABLE line_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    quantity DECIMAL(10, 2),
+    unit_price DECIMAL(10, 2),
+    amount DECIMAL(10, 2) NOT NULL,
+    suggested_code VARCHAR(50),
+    confidence DECIMAL(3, 2),
+    confirmed_code VARCHAR(50),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Human corrections tracking (TASK 6)
+CREATE TABLE correction_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+    field_name VARCHAR(100),
+    old_value TEXT,
+    new_value TEXT,
+    reviewer_id UUID,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Performance tracking (TASK 3)
+CREATE TABLE processing_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+    method VARCHAR(50),  -- 'traditional' or 'vision'
+    processing_time_ms INTEGER,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+2. **Backend Files** (Agent 1 creates):
+   - `backend/models.py` - SQLAlchemy models for ALL tables above
+   - `backend/services/invoice_storage_service.py` - Upload + file handling
+   - `backend/routers/invoices.py` - Add `POST /api/invoices/upload` endpoint
+   - `backend/alembic/versions/XXXXX_complete_schema.py` - Migration file
+
+3. **Frontend Component** (Agent 1 creates):
+   - `frontend/src/components/InvoiceUploadForm.tsx` - Drag & drop upload
+   - `frontend/src/types/invoice.ts` - TypeScript interfaces matching API contracts
+   - `frontend/src/services/invoiceApi.ts` - API client wrapper
+
+4. **Seed Data** (Agent 1 creates for testing):
+   - `backend/seed_data.sql` - Insert test subcontractors and cost codes
+```sql
+-- Example seed data for Agent 2 to test with
+INSERT INTO subcontractors (name, builder_id) VALUES
+    ('ABC Plumbing LLC', '00000000-0000-0000-0000-000000000001'),
+    ('Smith Electric Inc', '00000000-0000-0000-0000-000000000001'),
+    ('Johnson HVAC Services', '00000000-0000-0000-0000-000000000001');
+
+INSERT INTO cost_codes (code, label, description, builder_id) VALUES
+    ('15140', 'Plumbing - Rough-in', 'Install pipes and fixtures', '00000000-0000-0000-0000-000000000001'),
+    ('16050', 'Electrical - Wiring', 'Install electrical wiring', '00000000-0000-0000-0000-000000000001'),
+    ('23000', 'HVAC - Installation', 'Install heating and cooling systems', '00000000-0000-0000-0000-000000000001');
+```
+
+#### Verification Checklist:
+- [ ] Database migration runs successfully
+- [ ] All tables created with correct schema
+- [ ] Upload endpoint returns invoice_id
+- [ ] Files saved to `/uploads/{invoice_id}/original.{ext}`
+- [ ] Frontend can upload PDF/JPG/PNG
+- [ ] Seed data inserted successfully
+
+**Completion Timestamp**: _Agent 1 adds when done_  
+**Notes**:
+_Agent 1: Add any implementation notes, gotchas, or decisions made_
+
+---
+
+## PHASE 2: EXTRACTION ENGINES (PARALLEL)
+
+### TASK 2A: Traditional OCR Path
+**Status**: `TODO`  
+**Owner**: Agent 1  
+**Depends On**: TASK 1 (DONE)  
+**Blocks**: TASK 3  
+**Can Run in Parallel With**: TASK 2B
+
+#### Deliverables:
+1. **Backend Service** (Agent 1 owns):
+   - `backend/services/traditional_ocr_service.py`
+   ```python
+   from pdf2image import convert_from_path
+   import pytesseract
+   from PIL import Image
+   import re
+   
+   class TraditionalOCRService:
+       def process(self, invoice_path: str) -> ExtractionResult:
+           """
+           Returns ExtractionResult matching API contract above.
+           Must populate: fields, line_items, confidence, processing_time_ms
+           """
+           pass
+   ```
+
+2. **Backend Endpoint** (Agent 1 creates):
+   - Add to `backend/routers/invoices.py`:
+   ```python
+   @router.post("/invoices/{invoice_id}/extract/traditional")
+   async def extract_traditional(invoice_id: str):
+       # 1. Get invoice file_path from DB
+       # 2. Call TraditionalOCRService.process()
+       # 3. Save to extracted_fields and line_items tables
+       # 4. Update invoice.status = 'extracted'
+       # 5. Save processing_metrics
+       # 6. Return ExtractionResult
+       pass
+   ```
+
+3. **Frontend Component** (Agent 1 creates):
+   - `frontend/src/components/TraditionalOCRProcessor.tsx`
+   - Display raw OCR text, extracted fields, confidence scores
+   - Highlight low-confidence fields in yellow
+
+#### Verification:
+- [ ] Endpoint accepts invoice_id and returns ExtractionResult
+- [ ] Works with PDF and image files
+- [ ] Saves results to database correctly
+- [ ] Frontend displays extraction results
+- [ ] Processing time logged to processing_metrics
+
+**Completion Timestamp**: _Agent 1 adds when done_  
+**Notes**:
+_Agent 1: Add regex patterns used, accuracy issues found, etc._
+
+---
+
+### TASK 2B: Vision-Native AI Path
+**Status**: `TODO`  
+**Owner**: Agent 2  
+**Depends On**: TASK 1 (DONE), SETUP (Ollama installed)  
+**Blocks**: TASK 3  
+**Can Run in Parallel With**: TASK 2A
+
+#### Deliverables:
+1. **Backend Service** (Agent 2 owns):
+   - `backend/services/vision_ai_service.py`
+   ```python
+   import ollama
+   from pydantic import BaseModel
+   
+   class VisionAIService:
+       def process(self, invoice_path: str) -> ExtractionResult:
+           """
+           Returns ExtractionResult matching API contract above.
+           Must populate: fields, line_items, confidence, processing_time_ms
+           """
+           # 1. Call ollama.chat() with qwen2-vl:7b
+           # 2. Parse JSON response
+           # 3. Validate with Pydantic
+           # 4. Return ExtractionResult
+           pass
+   ```
+
+2. **Backend Endpoint** (Agent 2 creates):
+   - Add to `backend/routers/invoices.py`:
+   ```python
+   @router.post("/invoices/{invoice_id}/extract/vision")
+   async def extract_vision(invoice_id: str):
+       # 1. Get invoice file_path from DB
+       # 2. Call VisionAIService.process()
+       # 3. Save to extracted_fields and line_items tables
+       # 4. Update invoice.status = 'extracted'
+       # 5. Save processing_metrics
+       # 6. Return ExtractionResult
+       pass
+   ```
+
+3. **Frontend Component** (Agent 2 creates):
+   - `frontend/src/components/VisionAIProcessor.tsx`
+   - Display structured JSON output
+   - Show confidence scores per field
+   - Highlight successful extractions in green
+
+#### Verification:
+- [ ] Ollama service is running (`ollama list` shows qwen2-vl)
+- [ ] Endpoint accepts invoice_id and returns ExtractionResult
+- [ ] JSON parsing handles malformed LLM responses gracefully
+- [ ] Saves results to database correctly
+- [ ] Frontend displays extraction results
+- [ ] Processing time logged to processing_metrics
+
+**Completion Timestamp**: _Agent 2 adds when done_  
+**Notes**:
+_Agent 2: Add prompt used, LLM response format issues, etc._
+
+---
+
+## PHASE 3: INTELLIGENCE LAYER (PARALLEL)
+
+### TASK 4: Fuzzy Vendor Matching
+**Status**: `TODO`  
+**Owner**: Agent 1  
+**Depends On**: TASK 2A (DONE) OR TASK 2B (DONE) - need extracted vendor names  
+**Blocks**: TASK 6  
+**Can Run in Parallel With**: TASK 5
+
+#### Deliverables:
+1. **Backend Service** (Agent 1 owns):
+   - `backend/services/vendor_matching_service.py`
+   ```python
+   from rapidfuzz import fuzz, process
+   
+   class VendorMatchingService:
+       def match(self, extracted_vendor: str, builder_id: str) -> list[MatchCandidate]:
+           """
+           Returns top 3 matches with scores.
+           Threshold: 70+ to show, 85+ for auto-approve, 90+ for high confidence
+           """
+           pass
+   ```
+
+2. **Backend Endpoint** (Agent 1 creates):
+   - Add to `backend/routers/invoices.py`:
+   ```python
+   @router.post("/invoices/{invoice_id}/match-vendor")
+   async def match_vendor(invoice_id: str):
+       # 1. Get extracted_fields.vendor_name from DB
+       # 2. Call VendorMatchingService.match()
+       # 3. Save top match to vendor_matches table
+       # 4. Update invoice.status = 'matched'
+       # 5. Return match results with scores
+       pass
+   ```
+
+3. **Frontend Component** (Agent 1 creates):
+   - `frontend/src/components/VendorMatcher.tsx`
+   - Display extracted vendor name
+   - Show top 3 matches with similarity scores
+   - Color-code: Green (>90%), Yellow (85-90%), Red (<85%)
+   - Allow manual selection or "Add New Vendor" button
+
+#### Verification:
+- [ ] Fuzzy matching handles typos ("ABC Plumbing" matches "A.B.C. Plumbing LLC")
+- [ ] Scores calculated correctly (0-100)
+- [ ] Top 3 results returned sorted by score
+- [ ] Manual selection saves to vendor_matches
+- [ ] Low scores flag invoice for review (status = 'needs_review')
+
+**Completion Timestamp**: _Agent 1 adds when done_  
+**Notes**:
+_Agent 1: Add matching algorithm details, threshold tuning, etc._
+
+---
+
+### TASK 5: Cost Code Classification
+**Status**: `TODO`  
+**Owner**: Agent 2  
+**Depends On**: TASK 2A (DONE) OR TASK 2B (DONE) - need line items  
+**Blocks**: TASK 6  
+**Can Run in Parallel With**: TASK 4
+
+#### Deliverables:
+1. **Backend Service** (Agent 2 owns):
+   - `backend/services/cost_code_service.py`
+   ```python
+   from sentence_transformers import SentenceTransformer
+   import numpy as np
+   
+   class CostCodeService:
+       def __init__(self):
+           self.model = SentenceTransformer('all-MiniLM-L6-v2')
+       
+       def classify(self, line_items: list[dict], builder_id: str) -> list[ClassificationResult]:
+           """
+           Returns suggested cost code + confidence for each line item.
+           Threshold: <80% confidence requires review
+           """
+           pass
+   ```
+
+2. **Backend Endpoint** (Agent 2 creates):
+   - Add to `backend/routers/invoices.py`:
+   ```python
+   @router.post("/invoices/{invoice_id}/classify-costs")
+   async def classify_costs(invoice_id: str):
+       # 1. Get line_items from DB
+       # 2. Get cost_codes for builder from DB
+       # 3. Call CostCodeService.classify()
+       # 4. Update line_items with suggested_code and confidence
+       # 5. Update invoice.status = 'classified'
+       # 6. Flag for review if any confidence < 80%
+       # 7. Return classification results
+       pass
+   ```
+
+3. **Frontend Component** (Agent 2 creates):
+   - `frontend/src/components/CostCodeClassifier.tsx`
+   - Display line items with descriptions
+   - Show suggested cost code with confidence bar
+   - Dropdown to override with full cost code list
+   - Flag items <80% confidence in yellow
+
+#### Verification:
+- [ ] Sentence-BERT model loads successfully (~100MB download)
+- [ ] Cosine similarity calculated correctly
+- [ ] Suggested codes make semantic sense
+- [ ] Confidence scores in range 0.0-1.0
+- [ ] Low confidence items flagged for review
+- [ ] Manual overrides saved to confirmed_code
+
+**Completion Timestamp**: _Agent 2 adds when done_  
+**Notes**:
+_Agent 2: Add model performance, embedding cache strategy, etc._
+
+---
+
+## PHASE 4: INTEGRATION & REVIEW (PARALLEL)
+
+### TASK 3: Comparison Dashboard
+**Status**: `TODO`  
+**Owner**: Agent 2  
+**Depends On**: TASK 2A (DONE) AND TASK 2B (DONE)  
+**Blocks**: None  
+**Can Run in Parallel With**: TASK 6
+
+#### Deliverables:
+1. **Backend Service** (Agent 2 owns):
+   - `backend/services/comparison_service.py`
+   ```python
+   class ComparisonService:
+       def compare(self, invoice_id: str) -> ComparisonResult:
+           """
+           Fetch results from both extraction methods.
+           Calculate: accuracy, field-by-field diff, processing time diff
+           """
+           pass
+   ```
+
+2. **Backend Endpoint** (Agent 2 creates):
+   - Add to `backend/routers/invoices.py`:
+   ```python
+   @router.get("/invoices/{invoice_id}/comparison")
+   async def get_comparison(invoice_id: str):
+       # 1. Get extracted_fields for both methods
+       # 2. Get processing_metrics for both
+       # 3. Call ComparisonService.compare()
+       # 4. Return side-by-side results
+       pass
+   ```
+
+3. **Frontend Component** (Agent 2 creates):
+   - `frontend/src/components/ComparisonDashboard.tsx`
+   - Side-by-side layout: Traditional OCR | Vision AI
+   - Metrics cards: Processing time, confidence, field accuracy
+   - Visual diff of extracted fields (highlight mismatches)
+   - Chart: Accuracy comparison using recharts
+
+#### Verification:
+- [ ] Both extraction results display correctly
+- [ ] Field-by-field diff shows mismatches
+- [ ] Processing time comparison accurate
+- [ ] Chart displays comparison metrics
+- [ ] Handles case where only one method has run
+
+**Completion Timestamp**: _Agent 2 adds when done_  
+**Notes**:
+_Agent 2: Add comparison insights, visualization choices, etc._
+
+---
+
+### TASK 6: Review Workflow Dashboard
+**Status**: `TODO`  
+**Owner**: Agent 1  
+**Depends On**: TASK 4 (DONE) AND TASK 5 (DONE)  
+**Blocks**: None  
+**Can Run in Parallel With**: TASK 3
+
+#### Deliverables:
+1. **Backend Service** (Agent 1 owns):
+   - `backend/services/review_workflow_service.py`
+   ```python
+   class ReviewWorkflowService:
+       def update_status(self, invoice_id: str, new_status: str, corrections: dict):
+           """
+           Update invoice status, apply corrections, log to correction_history
+           """
+           pass
+   ```
+
+2. **Backend Endpoints** (Agent 1 creates):
+   - Add to `backend/routers/invoices.py`:
+   ```python
+   @router.get("/invoices")
+   async def list_invoices(status: str = None):
+       # Filter by status: needs_review, approved, etc.
+       pass
+   
+   @router.patch("/invoices/{invoice_id}/status")
+   async def update_status(invoice_id: str, status: str):
+       # Update invoice status (approved/rejected)
+       pass
+   
+   @router.post("/invoices/{invoice_id}/corrections")
+   async def save_corrections(invoice_id: str, corrections: dict):
+       # Save human corrections to correction_history
+       # Update extracted_fields with corrected values
+       pass
+   ```
+
+3. **Frontend Component** (Agent 1 creates):
+   - `frontend/src/components/ReviewDashboard.tsx`
+   - Split view: Invoice image | Extracted data form
+   - Filter dropdown: All | Needs Review | Approved | Rejected
+   - Inline editing for all fields
+   - Highlight low-confidence fields (<85%) in yellow
+   - Buttons: "Approve", "Reject", "Save Corrections"
+
+#### Verification:
+- [ ] List invoices filtered by status
+- [ ] Load invoice image and extracted data
+- [ ] Inline editing works for all fields
+- [ ] Corrections saved to correction_history
+- [ ] Status updates propagate correctly
+- [ ] Low-confidence fields highlighted
+
+**Completion Timestamp**: _Agent 1 adds when done_  
+**Notes**:
+_Agent 1: Add review UI/UX decisions, validation rules, etc._
+
+---
+
+## 🎯 PROJECT COMPLETION CHECKLIST
+
+### End-to-End Testing (Both Agents)
+- [ ] Upload invoice → Extract (Traditional) → Match Vendor → Classify Costs → Review → Approve
+- [ ] Upload invoice → Extract (Vision) → Match Vendor → Classify Costs → Review → Approve
+- [ ] Comparison dashboard shows both methods
+- [ ] Low-confidence invoices flagged correctly
+- [ ] Corrections saved and applied
+
+### Documentation (Both Agents)
+- [ ] Agent 1: Document traditional OCR accuracy and limitations
+- [ ] Agent 2: Document vision AI prompt engineering and results
+- [ ] Both: Create demo script with test invoices
+
+### Demo Preparation (Both Agents)
+- [ ] Prepare 3 test invoices: simple, complex, low-quality
+- [ ] Run both extraction methods on all 3
+- [ ] Document comparison results
+- [ ] Practice demo walkthrough (5-7 minutes)
+
+---
+
+## 📝 AGENT NOTES & COMMUNICATION
+
+### Agent 1 Notes:
+_Add blockers, questions, or updates here_
+
+---
+
+### Agent 2 Notes:
+_Add blockers, questions, or updates here_
+
+---
+
+## 🔄 CHANGE LOG
+- **2026-01-25**: Document created with full task breakdown and coordination rules

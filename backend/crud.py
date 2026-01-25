@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from .models import Receipt
-from .schemas import ReceiptCreate, ReceiptUpdate
-from .database import get_db
+from models import Receipt
+from schemas import ReceiptCreate, ReceiptUpdate
+from database import get_db
 
 async def get_receipts(db: AsyncSession, skip: int = 0, limit: int = 100):
     result = await db.execute(select(Receipt).offset(skip).limit(limit))

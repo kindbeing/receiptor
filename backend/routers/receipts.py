@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from ..database import get_db
-from ..crud import get_receipts, get_receipt, create_receipt, update_receipt, delete_receipt
-from ..schemas import Receipt, ReceiptCreate, ReceiptUpdate
+from database import get_db
+from crud import get_receipts, get_receipt, create_receipt, update_receipt, delete_receipt
+from schemas import Receipt, ReceiptCreate, ReceiptUpdate
 
 router = APIRouter(prefix="/receipts", tags=["receipts"])
 
