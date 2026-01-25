@@ -4,6 +4,8 @@ import InvoiceUploadForm from './components/InvoiceUploadForm'
 import { TraditionalOCRProcessor } from './components/TraditionalOCRProcessor'
 import { VisionAIProcessor } from './components/VisionAIProcessor'
 import { VendorMatcher } from './components/VendorMatcher'
+import { CostCodeClassifier } from './components/CostCodeClassifier'
+import { ComparisonDashboard } from './components/ComparisonDashboard'
 import type { Invoice, ExtractionResult } from './types/invoice'
 import './App.css'
 
@@ -45,9 +47,25 @@ function App() {
     }
   }
 
+  const handleClassificationComplete = () => {
+    // Refresh invoice list to show updated status
+    console.log('Cost code classification complete')
+    if (selectedInvoiceId) {
+      setUploadedInvoices(prev => 
+        prev.map(inv => 
+          inv.id === selectedInvoiceId 
+            ? { ...inv, status: 'classified' }
+            : inv
+        )
+      )
+    }
+  }
+
   // Check if selected invoice has been extracted
   const selectedInvoice = uploadedInvoices.find(inv => inv.id === selectedInvoiceId)
   const showVendorMatcher = selectedInvoice && 
+    ['extracted', 'matched', 'classified', 'needs_review'].includes(selectedInvoice.status)
+  const showCostCodeClassifier = selectedInvoice && 
     ['extracted', 'matched', 'classified', 'needs_review'].includes(selectedInvoice.status)
 
   return (
@@ -120,6 +138,15 @@ function App() {
                       onMatchComplete={handleMatchComplete}
                     />
                   )}
+                  
+                  {showCostCodeClassifier && (
+                    <CostCodeClassifier 
+                      invoice={selectedInvoice}
+                      onClassificationComplete={handleClassificationComplete}
+                    />
+                  )}
+                  
+                  <ComparisonDashboard invoice={selectedInvoice || null} />
                 </>
               ) : (
                 <div className="no-selection">

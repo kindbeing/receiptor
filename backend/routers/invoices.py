@@ -12,6 +12,8 @@ from services.invoice_storage_service import storage_service
 from services.vision_ai_service import vision_service
 from services.traditional_ocr_service import TraditionalOCRService
 from services.vendor_matching_service import VendorMatchingService, MatchCandidate
+from services.cost_code_service import cost_code_service
+from services.comparison_service import comparison_service
 from crud import create_vendor_match, update_invoice_status, get_invoice as crud_get_invoice
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
@@ -440,3 +442,131 @@ async def match_vendor(
         "message": "High confidence match" if status == "matched" else "Review required"
     }
 
+
+@router.post("/{invoice_id}/classify-costs")
+async def classify_costs(
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Classify invoice line items to cost codes using semantic similarity.
+    
+    Args:
+        invoice_id: UUID of the invoice
+        db: Database session
+    
+    Returns:
+        Classification results with suggested codes and confidence scores
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    # Get invoice
+    invoice = await crud_get_invoice(db, invoice_uuid)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Check if invoice has been extracted
+    if invoice.status not in ["extracted", "matched", "classified", "needs_review"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Invoice must be extracted before cost code classification"
+        )
+    
+    # Get line items
+    result = await db.execute(
+        select(LineItem).where(LineItem.invoice_id == invoice_uuid)
+    )
+    line_items = result.scalars().all()
+    
+    if not line_items:
+        raise HTTPException(
+            status_code=400,
+            detail="No line items found for this invoice"
+        )
+    
+    # Convert to dict format for service
+    line_items_dict = [
+        {
+            "id": str(item.id),
+            "description": item.description,
+            "quantity": float(item.quantity) if item.quantity else None,
+            "unit_price": float(item.unit_price) if item.unit_price else None,
+            "amount": float(item.amount)
+        }
+        for item in line_items
+    ]
+    
+    # Classify using cost code service
+    classified_items = cost_code_service.classify_line_items(
+        line_items=line_items_dict,
+        builder_id=str(invoice.builder_id),
+        db=db
+    )
+    
+    # Update line items in database with suggested codes
+    needs_review = False
+    for classified in classified_items:
+        item_id = uuid.UUID(classified['id'])
+        result = await db.execute(
+            select(LineItem).where(LineItem.id == item_id)
+        )
+        line_item = result.scalar_one_or_none()
+        
+        if line_item:
+            line_item.suggested_code = classified.get('suggested_code')
+            line_item.confidence = classified.get('confidence')
+            
+            # Flag for review if confidence < 80%
+            if classified.get('confidence', 0) < 0.80:
+                needs_review = True
+    
+    # Update invoice status
+    if needs_review and invoice.status != "needs_review":
+        await update_invoice_status(db, invoice.id, "needs_review")
+        status = "needs_review"
+    else:
+        await update_invoice_status(db, invoice.id, "classified")
+        status = "classified"
+    
+    await db.commit()
+    
+    # Return classification results
+    return {
+        "invoice_id": str(invoice.id),
+        "line_items": classified_items,
+        "status": status,
+        "needs_review": needs_review,
+        "message": "Classification complete" if not needs_review else "Review required for low-confidence items"
+    }
+
+
+@router.get("/{invoice_id}/comparison")
+async def get_comparison(
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get side-by-side comparison of Traditional OCR vs Vision AI extraction results.
+    
+    Args:
+        invoice_id: UUID of the invoice
+        db: Database session
+    
+    Returns:
+        Comparison data with both methods' results and metrics
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    try:
+        comparison_data = await comparison_service.compare(invoice_uuid, db)
+        return comparison_data
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Comparison failed: {str(e)}")

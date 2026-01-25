@@ -130,5 +130,37 @@ export const invoiceApi = {
 
     return response.json();
   },
+
+  /**
+   * Classify line items to cost codes using semantic similarity
+   */
+  async classifyCosts(invoiceId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/classify-costs`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to classify costs');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get comparison of Traditional OCR vs Vision AI extraction results
+   */
+  async getComparison(invoiceId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/comparison`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to get comparison');
+    }
+
+    return response.json();
+  },
 };
+
+export const { uploadInvoice, getInvoice, listInvoices, deleteInvoice, extractTraditional, extractVision, matchVendor, classifyCosts, getComparison } = invoiceApi;
 
