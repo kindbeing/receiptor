@@ -199,63 +199,33 @@ _Agent 1: Add regex patterns used, accuracy issues found, etc._
 ---
 
 ### TASK 2B: Vision-Native AI Path
-**Status**: `TODO`  
+**Status**: `IN_PROGRESS` (Agent 2, started 2026-01-25)  
 **Owner**: Agent 2  
-**Depends On**: TASK 1 (DONE), SETUP (Ollama installed)  
+**Depends On**: TASK 1 ✅  
 **Blocks**: TASK 3  
 **Can Run in Parallel With**: TASK 2A
 
-#### Deliverables:
-1. **Backend Service** (Agent 2 owns):
-   - `backend/services/vision_ai_service.py`
-   ```python
-   import ollama
-   from pydantic import BaseModel
-   
-   class VisionAIService:
-       def process(self, invoice_path: str) -> ExtractionResult:
-           """
-           Returns ExtractionResult matching API contract above.
-           Must populate: fields, line_items, confidence, processing_time_ms
-           """
-           # 1. Call ollama.chat() with qwen2-vl:7b
-           # 2. Parse JSON response
-           # 3. Validate with Pydantic
-           # 4. Return ExtractionResult
-           pass
-   ```
-
-2. **Backend Endpoint** (Agent 2 creates):
-   - Add to `backend/routers/invoices.py`:
-   ```python
-   @router.post("/invoices/{invoice_id}/extract/vision")
-   async def extract_vision(invoice_id: str):
-       # 1. Get invoice file_path from DB
-       # 2. Call VisionAIService.process()
-       # 3. Save to extracted_fields and line_items tables
-       # 4. Update invoice.status = 'extracted'
-       # 5. Save processing_metrics
-       # 6. Return ExtractionResult
-       pass
-   ```
-
-3. **Frontend Component** (Agent 2 creates):
-   - `frontend/src/components/VisionAIProcessor.tsx`
-   - Display structured JSON output
-   - Show confidence scores per field
-   - Highlight successful extractions in green
+#### Implemented:
+- [x] `backend/services/vision_ai_service.py` - Qwen2-VL integration with JSON parsing
+- [x] `backend/routers/invoices.py` - POST `/invoices/{invoice_id}/extract/vision` endpoint
+- [x] `backend/tests/test_vision_extraction.py` - Integration tests
+- [x] `backend/pyproject.toml` - Added ollama dependency
+- [x] Database writes to: extracted_fields, line_items, processing_metrics
+- [x] Graceful error handling for malformed LLM responses
+- [ ] Frontend component (pending)
 
 #### Verification:
-- [ ] Ollama service is running (`ollama list` shows qwen2-vl)
-- [ ] Endpoint accepts invoice_id and returns ExtractionResult
-- [ ] JSON parsing handles malformed LLM responses gracefully
-- [ ] Saves results to database correctly
-- [ ] Frontend displays extraction results
-- [ ] Processing time logged to processing_metrics
+- [x] Endpoint accepts invoice_id and returns ExtractionResult
+- [x] JSON parsing handles malformed LLM responses gracefully
+- [x] Saves results to database correctly
+- [x] Processing time logged to processing_metrics
+- [ ] Ollama service running verification (requires user setup)
+- [ ] Frontend displays extraction results (pending)
 
-**Completion Timestamp**: _Agent 2 adds when done_  
 **Notes**:
-_Agent 2: Add prompt used, LLM response format issues, etc._
+- Prompt extracts: vendor_name, invoice_number, invoice_date, total_amount, line_items, confidence
+- JSON extraction handles markdown code blocks and extra text
+- Returns confidence 0.0-1.0, status: success/partial/failed based on confidence threshold
 
 ---
 
@@ -524,7 +494,8 @@ _Agent 1: Add review UI/UX decisions, validation rules, etc._
 ---
 
 ### Agent 2 Notes:
-_Add blockers, questions, or updates here_
+- 2026-01-25: TASK 2B backend implementation complete (service + endpoint + tests)
+- Next: Frontend component for Vision AI, then TASK 5 (Cost Code Classification)
 
 ---
 
