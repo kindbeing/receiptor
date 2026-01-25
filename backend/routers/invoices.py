@@ -10,8 +10,12 @@ from models import Invoice, ExtractedField, LineItem, ProcessingMetric
 from schemas import InvoiceUploadResponse, InvoiceDetailResponse, ExtractionResult
 from services.invoice_storage_service import storage_service
 from services.vision_ai_service import vision_service
+from services.traditional_ocr_service import TraditionalOCRService
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
+
+# Initialize services
+traditional_ocr_service = TraditionalOCRService()
 
 
 @router.post("/upload", response_model=InvoiceUploadResponse)
@@ -184,6 +188,95 @@ async def delete_invoice(
     await db.commit()
     
     return {"detail": "Invoice deleted successfully"}
+
+
+@router.post("/{invoice_id}/extract/traditional", response_model=ExtractionResult)
+async def extract_traditional(
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Extract invoice data using Traditional OCR (Tesseract + regex).
+    
+    Args:
+        invoice_id: UUID of the invoice
+        db: Database session
+    
+    Returns:
+        ExtractionResult with extracted fields, line items, and confidence scores
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    # Get invoice from database
+    result = await db.execute(
+        select(Invoice).where(Invoice.id == invoice_uuid)
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Update status to processing
+    invoice.status = "processing"
+    await db.commit()
+    
+    try:
+        # Process invoice with Traditional OCR
+        extraction_result = traditional_ocr_service.process(
+            invoice_path=invoice.file_path,
+            invoice_id=str(invoice.id)
+        )
+        
+        # Save extracted fields to database
+        extracted_field = ExtractedField(
+            invoice_id=invoice.id,
+            vendor_name=extraction_result.fields.vendor_name,
+            invoice_number=extraction_result.fields.invoice_number,
+            invoice_date=extraction_result.fields.invoice_date,
+            total_amount=extraction_result.fields.total_amount,
+            confidence=extraction_result.confidence,
+            raw_json=extraction_result.raw_output
+        )
+        db.add(extracted_field)
+        
+        # Save line items
+        for item in extraction_result.line_items:
+            line_item = LineItem(
+                invoice_id=invoice.id,
+                description=item.description,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                amount=item.total
+            )
+            db.add(line_item)
+        
+        # Save processing metrics
+        metric = ProcessingMetric(
+            invoice_id=invoice.id,
+            method="traditional",
+            processing_time_ms=extraction_result.processing_time_ms
+        )
+        db.add(metric)
+        
+        # Update invoice status
+        invoice.status = "extracted"
+        invoice.processing_method = "traditional"
+        
+        await db.commit()
+        
+        return extraction_result
+        
+    except Exception as e:
+        # Rollback to uploaded state on error
+        invoice.status = "uploaded"
+        await db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Traditional OCR extraction failed: {str(e)}"
+        )
 
 
 @router.post("/{invoice_id}/extract/vision", response_model=ExtractionResult)

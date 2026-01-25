@@ -1,5 +1,5 @@
 // Invoice API Service
-import type { Invoice, InvoiceDetail } from '../types/invoice';
+import type { Invoice, InvoiceDetail, ExtractionResult } from '../types/invoice';
 
 const API_BASE_URL = 'http://localhost:8000/api/invoices';
 
@@ -81,6 +81,38 @@ export const invoiceApi = {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to delete invoice');
     }
+  },
+
+  /**
+   * Extract invoice data using Traditional OCR
+   */
+  async extractTraditional(invoiceId: string): Promise<ExtractionResult> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/extract/traditional`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to extract invoice with Traditional OCR');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Extract invoice data using Vision AI
+   */
+  async extractVision(invoiceId: string): Promise<ExtractionResult> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/extract/vision`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to extract invoice with Vision AI');
+    }
+
+    return response.json();
   },
 };
 
