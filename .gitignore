@@ -1,0 +1,6 @@
+.idea
+backend/.venv
+backend/.idea
+backend/src/uploads/
+**/__pycache__/**
+frontend/node_modules
