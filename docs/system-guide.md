@@ -105,6 +105,7 @@ Show BuilderTrend three approaches to prove technical depth and business thinkin
 - **Backend**: FastAPI, SQLAlchemy, PostgreSQL, Python 3.12+
 - **Frontend**: React, TypeScript, Vite
 - **OCR**: Tesseract (traditional), Qwen2.5vl:7b (vision)
+  - Recommendation: qwen2.5vl:3b -> qwen2.5vl:7b -> llama3.2-vision:11b
 - **ML Models**: Sentence-BERT (all-MiniLM-L6-v2), RapidFuzz
 - **Thresholds**: Extraction 70%, Vendor 85%, Cost Code 80%
 
