@@ -71,8 +71,9 @@ Return ONLY valid JSON, no additional text."""
             confidence = parsed_data.get('confidence', 0.85)
             extraction_status = "success" if confidence > 0.7 else "partial"
             
+            # Note: invoice_id will be set by the caller in the router
             return ExtractionResult(
-                invoice_id=None,
+                invoice_id="00000000-0000-0000-0000-000000000000",  # Placeholder, set by router
                 processing_method="vision",
                 extraction_status=extraction_status,
                 fields=fields,
@@ -86,7 +87,7 @@ Return ONLY valid JSON, no additional text."""
         except json.JSONDecodeError as e:
             processing_time_ms = int((time.time() - start_time) * 1000)
             return ExtractionResult(
-                invoice_id=None,
+                invoice_id="00000000-0000-0000-0000-000000000000",  # Placeholder, set by router
                 processing_method="vision",
                 extraction_status="failed",
                 fields=ExtractedFieldsBase(),
@@ -99,7 +100,7 @@ Return ONLY valid JSON, no additional text."""
         except Exception as e:
             processing_time_ms = int((time.time() - start_time) * 1000)
             return ExtractionResult(
-                invoice_id=None,
+                invoice_id="00000000-0000-0000-0000-000000000000",  # Placeholder, set by router
                 processing_method="vision",
                 extraction_status="failed",
                 fields=ExtractedFieldsBase(),

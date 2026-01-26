@@ -42,7 +42,7 @@
 5. ✅ **TASK 6: Review Workflow** - `backend/services/review_workflow_service.py`, `frontend/src/components/ReviewDashboard.tsx`, correction tracking
 
 **Agent 2** (Completed 2026-01-25):
-1. ✅ **SETUP** - Ollama, Qwen2.5-VL 7B model
+1. ✅ **SETUP** - Ollama, Qwen2.5vl:7b 7B model
 2. ✅ **TASK 2B: Vision AI** - `backend/services/vision_ai_service.py`, `frontend/src/components/VisionAIProcessor.tsx`
 3. ✅ **TASK 5: Cost Code Classification** - `backend/services/cost_code_service.py`, Sentence-BERT embeddings, 80% threshold
 4. ✅ **TASK 3: Comparison Dashboard** - `backend/services/comparison_service.py`, `frontend/src/components/ComparisonDashboard.tsx`
@@ -88,25 +88,3 @@
 4. Test cost code classification
 5. Validate Review Workflow for low-confidence invoices
 6. Test correction tracking and approval flow
-
----
-
-### Bug Fixes - 2026-01-26 (Testing Phase)
-
-**Issues Fixed:**
-1. ✅ **Vendor Matching Fallback** - Now uses highest confidence extraction (Vision AI over failed Traditional OCR)
-2. ✅ **Cost Code Async/Await** - Converted `cost_code_service` from sync `.query()` to async `select()`
-
-**Root Causes:**
-- Vendor matching used `.first()` which selected Traditional OCR's NULL vendor_name, ignoring Vision AI's successful extraction
-- Cost code service used sync `db.query()` on `AsyncSession` object (SQLAlchemy 2.0 incompatibility)
-
-**Files Modified:**
-- `backend/routers/invoices.py` - Added `.order_by(confidence.desc())` to vendor matching
-- `backend/services/cost_code_service.py` - Converted to async/await with `select()` statements
-
-**Test Results:**
-- ABC Plumbing: 100% Traditional OCR, 100% Vision AI (perfect extraction)
-- Johnson HVAC: 0% Traditional OCR failure, 95% Vision AI success (demonstrates ROI)
-
-**Status:** Ready for re-test of vendor matching and cost code classification

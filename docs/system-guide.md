@@ -95,7 +95,7 @@ Show BuilderTrend three approaches to prove technical depth and business thinkin
 ### Completed Features
 1. **Invoice Upload & Storage** - `backend/routers/invoices.py`, `frontend/src/components/InvoiceUploadForm.tsx`
 2. **Traditional OCR** - `backend/services/traditional_ocr_service.py`, Tesseract 5.5.2
-3. **Vision AI** - `backend/services/vision_ai_service.py`, Qwen2.5-VL 7B via Ollama
+3. **Vision AI** - `backend/services/vision_ai_service.py`, Qwen2.5vl:7b 7B via Ollama
 4. **Vendor Matching** - `backend/services/vendor_matching_service.py`, RapidFuzz fuzzy matching
 5. **Cost Classification** - `backend/services/cost_code_service.py`, Sentence-BERT embeddings
 6. **Comparison Dashboard** - `backend/services/comparison_service.py`, `frontend/src/components/ComparisonDashboard.tsx`
@@ -104,7 +104,7 @@ Show BuilderTrend three approaches to prove technical depth and business thinkin
 ### Technical Stack
 - **Backend**: FastAPI, SQLAlchemy, PostgreSQL, Python 3.12+
 - **Frontend**: React, TypeScript, Vite
-- **OCR**: Tesseract (traditional), Qwen2.5-VL (vision)
+- **OCR**: Tesseract (traditional), Qwen2.5vl:7b (vision)
 - **ML Models**: Sentence-BERT (all-MiniLM-L6-v2), RapidFuzz
 - **Thresholds**: Extraction 70%, Vendor 85%, Cost Code 80%
 

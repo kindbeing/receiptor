@@ -37,8 +37,14 @@ class TraditionalOCRService:
                 r'#\s*([A-Z0-9-]{3,})',
             ],
             'date': [
+                # YYYY-MM-DD format
+                r'(?i)(?:invoice\s+)?date[\s:]*(\d{4}-\d{1,2}-\d{1,2})',
+                # MM/DD/YYYY or MM-DD-YYYY
                 r'(?i)(?:invoice\s+)?date[\s:]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
                 r'(?i)date[\s:]*(\d{1,2}/\d{1,2}/\d{2,4})',
+                # Any YYYY-MM-DD standalone
+                r'(\d{4}-\d{1,2}-\d{1,2})',
+                # Any MM/DD/YYYY standalone
                 r'(\d{1,2}/\d{1,2}/\d{4})',
             ],
             'vendor': [
@@ -177,7 +183,7 @@ class TraditionalOCRService:
         """
         line_items = []
         
-        # Pattern: description followed by numbers (quantity, price, total)
+        # Pattern 1: description followed by numbers (quantity, price, total)
         # Example: "Plumbing work  10  50.00  500.00"
         pattern = r'([A-Za-z][A-Za-z\s-]+)\s+(\d+(?:\.\d{2})?)\s+(?:\$)?(\d+\.\d{2})\s+(?:\$)?(\d+\.\d{2})'
         
@@ -194,7 +200,32 @@ class TraditionalOCRService:
                 'total': total
             })
         
-        # If no line items found with full pattern, try simpler pattern
+        # Pattern 2: More flexible - description with amount (handles dashes, special chars)
+        # Example: "Install copper piping – rough-in $3,200.00"
+        if not line_items:
+            # Match descriptions with amounts, including em-dashes, hyphens, etc.
+            flexible_pattern = r'([A-Za-z][A-Za-z\s\-–—,]+)\s+\$?([\d,]+\.\d{2})'
+            
+            for match in re.finditer(flexible_pattern, text):
+                description = match.group(1).strip()
+                amount_str = match.group(2).replace(',', '')
+                
+                # Filter out header-like text and ensure reasonable description length
+                if len(description) > 10 and not re.search(r'(?i)(invoice|total|subtotal|tax|balance|due)', description):
+                    try:
+                        total = float(amount_str)
+                        # Only add if amount is reasonable (> $10, < $1,000,000)
+                        if 10.0 <= total <= 1000000.0:
+                            line_items.append({
+                                'description': description,
+                                'quantity': None,
+                                'unit_price': None,
+                                'total': total
+                            })
+                    except ValueError:
+                        continue
+        
+        # Pattern 3: Fallback - simple description and amount without special formatting
         if not line_items:
             # Just description and amount
             simple_pattern = r'([A-Za-z][A-Za-z\s-]{10,})\s+(?:\$)?(\d+\.\d{2})'

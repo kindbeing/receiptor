@@ -382,9 +382,11 @@ async def match_vendor(
             detail="Invoice must be extracted before vendor matching"
         )
     
-    # Get extracted vendor name
+    # Get extracted vendor name - prioritize highest confidence extraction
     result = await db.execute(
-        select(ExtractedField).where(ExtractedField.invoice_id == invoice_uuid)
+        select(ExtractedField)
+        .where(ExtractedField.invoice_id == invoice_uuid)
+        .order_by(ExtractedField.confidence.desc())
     )
     extracted_field = result.scalars().first()
     
@@ -501,7 +503,7 @@ async def classify_costs(
     ]
     
     # Classify using cost code service
-    classified_items = cost_code_service.classify_line_items(
+    classified_items = await cost_code_service.classify_line_items(
         line_items=line_items_dict,
         builder_id=str(invoice.builder_id),
         db=db
@@ -520,8 +522,8 @@ async def classify_costs(
             line_item.suggested_code = classified.get('suggested_code')
             line_item.confidence = classified.get('confidence')
             
-            # Flag for review if confidence < 80%
-            if classified.get('confidence', 0) < 0.80:
+            # Flag for review if confidence < 60%
+            if classified.get('confidence', 0) < 0.60:
                 needs_review = True
     
     # Update invoice status

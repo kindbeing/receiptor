@@ -235,7 +235,7 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ invoic
         <div className="method-panel vision-panel">
           <div className="panel-header">
             <h3>Vision AI</h3>
-            <span className="method-badge vision">Qwen2.5-VL</span>
+            <span className="method-badge vision">Qwen2.5vl:7b</span>
           </div>
 
           {!vision.available ? (

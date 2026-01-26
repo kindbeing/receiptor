@@ -1,7 +1,8 @@
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from typing import List, Dict, Tuple
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models import CostCode, LineItem
 import uuid
 
@@ -11,11 +12,11 @@ class CostCodeService:
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
         self._embeddings_cache = {}
     
-    def classify_line_items(
+    async def classify_line_items(
         self, 
         line_items: List[Dict], 
         builder_id: str,
-        db: Session
+        db: AsyncSession
     ) -> List[Dict]:
         """
         Classify line items to cost codes using semantic similarity.
@@ -28,9 +29,10 @@ class CostCodeService:
         Returns:
             List of dicts with suggested_code and confidence added
         """
-        cost_codes = db.query(CostCode).filter(
-            CostCode.builder_id == uuid.UUID(builder_id)
-        ).all()
+        result = await db.execute(
+            select(CostCode).where(CostCode.builder_id == uuid.UUID(builder_id))
+        )
+        cost_codes = result.scalars().all()
         
         if not cost_codes:
             return [{
