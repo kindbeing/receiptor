@@ -15,15 +15,31 @@ export const InvoiceReviewForm: React.FC<InvoiceReviewFormProps> = ({ invoice, o
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load extracted fields from invoice (prefer vision, fallback to traditional)
-    const extractedField = invoice.extracted_fields;
+    // Load extracted fields from invoice
+    // extracted_fields is an array - select the best one (highest confidence, or most recent)
+    const extractedFields = invoice.extracted_fields || [];
     
-    if (extractedField) {
+    let bestExtraction = null;
+    if (extractedFields.length > 0) {
+      // Sort by confidence (descending), then by created_at (most recent first)
+      const sorted = [...extractedFields].sort((a, b) => {
+        const confA = a.confidence ?? 0;
+        const confB = b.confidence ?? 0;
+        if (confA !== confB) {
+          return confB - confA; // Higher confidence first
+        }
+        // If confidence is equal, use most recent
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      bestExtraction = sorted[0];
+    }
+    
+    if (bestExtraction) {
       const data: ReviewFormData = {
-        vendor_name: extractedField.vendor_name || '',
-        invoice_number: extractedField.invoice_number || '',
-        invoice_date: extractedField.invoice_date || '',
-        total_amount: extractedField.total_amount || 0,
+        vendor_name: bestExtraction.vendor_name || '',
+        invoice_number: bestExtraction.invoice_number || '',
+        invoice_date: bestExtraction.invoice_date || '',
+        total_amount: bestExtraction.total_amount || 0,
         line_items: invoice.line_items || []
       };
       
@@ -33,7 +49,17 @@ export const InvoiceReviewForm: React.FC<InvoiceReviewFormProps> = ({ invoice, o
   }, [invoice]);
 
   const getConfidence = (fieldName: string): number | undefined => {
-    return invoice.extracted_fields?.confidence;
+    // Get confidence from the best extraction (highest confidence)
+    const extractedFields = invoice.extracted_fields || [];
+    if (extractedFields.length === 0) return undefined;
+    
+    const sorted = [...extractedFields].sort((a, b) => {
+      const confA = a.confidence ?? 0;
+      const confB = b.confidence ?? 0;
+      return confB - confA;
+    });
+    
+    return sorted[0]?.confidence;
   };
 
   const isLowConfidence = (fieldName: string): boolean => {
@@ -108,11 +134,14 @@ export const InvoiceReviewForm: React.FC<InvoiceReviewFormProps> = ({ invoice, o
     <div className="invoice-review-form">
       <div className="form-header">
         <h3>Invoice Details</h3>
-        {invoice.extracted_fields?.confidence && (
-          <div className="overall-confidence">
-            Overall Confidence: {(invoice.extracted_fields.confidence * 100).toFixed(0)}%
-          </div>
-        )}
+        {(() => {
+          const confidence = getConfidence('');
+          return confidence !== undefined && (
+            <div className="overall-confidence">
+              Overall Confidence: {(confidence * 100).toFixed(0)}%
+            </div>
+          );
+        })()}
       </div>
 
       <div className="form-body">

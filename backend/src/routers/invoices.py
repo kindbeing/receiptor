@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from database import get_db
 from models import Invoice, ExtractedField, LineItem, ProcessingMetric
@@ -716,3 +718,55 @@ async def get_corrections(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get corrections: {str(e)}")
+
+
+@router.get("/{invoice_id}/image")
+async def get_invoice_image(
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get the original invoice image/PDF file.
+    
+    Args:
+        invoice_id: UUID of the invoice
+        db: Database session
+    
+    Returns:
+        FileResponse with the invoice image
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    # Get invoice from database
+    result = await db.execute(
+        select(Invoice).where(Invoice.id == invoice_uuid)
+    )
+    invoice = result.scalar_one_or_none()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Get the file path from storage service
+    try:
+        file_path = storage_service.get_original_file_path(invoice.id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Invoice image file not found")
+    
+    # Determine media type based on file extension
+    ext = file_path.suffix.lower()
+    media_type_map = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.pdf': 'application/pdf'
+    }
+    media_type = media_type_map.get(ext, 'application/octet-stream')
+    
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=invoice.filename
+    )

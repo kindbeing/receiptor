@@ -68,7 +68,7 @@ export interface ExtractionResult {
 }
 
 export interface InvoiceDetail extends Invoice {
-  extracted_fields?: ExtractedFieldResponse;
+  extracted_fields: ExtractedFieldResponse[];  // Array - invoice can have multiple extractions
   line_items: LineItemResponse[];
   vendor_matches: VendorMatch[];
   processing_metrics: ProcessingMetric[];

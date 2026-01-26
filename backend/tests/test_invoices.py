@@ -122,3 +122,63 @@ async def test_get_invoice_invalid_uuid(client, test_db):
     assert response.status_code == 400
     assert "invalid" in response.json()["detail"].lower()
 
+
+@pytest.mark.asyncio
+async def test_get_invoice_image(client, test_db, tmp_path):
+    """Test GET /api/invoices/{invoice_id}/image returns the invoice image file."""
+    from pathlib import Path
+    import shutil
+    from services.invoice_storage_service import storage_service
+    
+    # Setup: Create test invoice and image file
+    builder_id = uuid4()
+    invoice = Invoice(
+        filename="test_invoice.png",
+        file_path="uploads/test/original.png",
+        builder_id=builder_id,
+        status="uploaded"
+    )
+    test_db.add(invoice)
+    await test_db.commit()
+    
+    # Create actual test image file
+    invoice_dir = Path("uploads") / str(invoice.id)
+    invoice_dir.mkdir(parents=True, exist_ok=True)
+    test_image_path = invoice_dir / "original.png"
+    
+    # Create a simple PNG file (1x1 pixel)
+    png_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    test_image_path.write_bytes(png_data)
+    
+    try:
+        # Test: Call the image endpoint
+        response = await client.get(f"/api/invoices/{invoice.id}/image")
+        
+        # Assert: Verify response
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert response.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]
+        assert len(response.content) > 0
+    finally:
+        # Cleanup
+        if invoice_dir.exists():
+            shutil.rmtree(invoice_dir)
+
+
+@pytest.mark.asyncio
+async def test_get_invoice_image_not_found(client, test_db):
+    """Test GET /api/invoices/{invoice_id}/image returns 404 when image doesn't exist."""
+    # Create invoice without actual file
+    builder_id = uuid4()
+    invoice = Invoice(
+        filename="missing.png",
+        file_path="uploads/missing/original.png",
+        builder_id=builder_id,
+        status="uploaded"
+    )
+    test_db.add(invoice)
+    await test_db.commit()
+    
+    response = await client.get(f"/api/invoices/{invoice.id}/image")
+    
+    assert response.status_code == 404
+

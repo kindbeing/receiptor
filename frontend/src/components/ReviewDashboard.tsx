@@ -113,8 +113,8 @@ export const ReviewDashboard: React.FC = () => {
   };
 
   const getInvoiceImageUrl = (invoice: InvoiceDetail): string => {
-    // Assuming images are served from backend uploads folder
-    return `http://localhost:8000/uploads/${invoice.id}/${invoice.filename}`;
+    // Use the dedicated image endpoint
+    return `http://localhost:8000/api/invoices/${invoice.id}/image`;
   };
 
   return (
