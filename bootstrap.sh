@@ -99,7 +99,8 @@ setup_database() {
     log "Setting up receiptor_db database..."
 
     # Check if database already exists
-    if psql -h localhost -p 5432 -U postgres -lqt | cut -d \| -f 1 | grep -qw receiptor_db; then
+    export PGPASSWORD='password'
+    if psql -h localhost -p 5432 -U root -lqt | cut -d \| -f 1 | grep -qw receiptor_db; then
         success "Database receiptor_db already exists"
         return
     fi
@@ -190,7 +191,7 @@ setup_backend_deps() {
 
     log "Installing backend dependencies..."
     source .venv/bin/activate
-    pip install -e .
+    uv sync
     success "Backend dependencies installed"
 
     # Run database migrations
