@@ -44,11 +44,14 @@ class LineItemBase(BaseModel):
     total: float
 
 
-class LineItemResponse(LineItemBase):
+class LineItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     id: UUID
     invoice_id: UUID
+    description: str
+    quantity: Optional[float] = None
+    unit_price: Optional[float] = None
     amount: float
     suggested_code: Optional[str] = None
     confidence: Optional[float] = None
@@ -145,7 +148,7 @@ class InvoiceDetailResponse(BaseModel):
     status: str
     processing_method: Optional[str] = None
     created_at: datetime
-    extracted_fields: Optional[ExtractedFieldResponse] = None
+    extracted_fields: List[ExtractedFieldResponse] = []
     line_items: List[LineItemResponse] = []
     vendor_matches: List[VendorMatchResponse] = []
     processing_metrics: List[ProcessingMetricResponse] = []

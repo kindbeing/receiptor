@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 import uuid
 from datetime import datetime
@@ -98,9 +99,16 @@ async def get_invoice(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid invoice_id format")
     
-    # Query with relationships
+    # Query with relationships eagerly loaded
     result = await db.execute(
-        select(Invoice).where(Invoice.id == invoice_uuid)
+        select(Invoice)
+        .options(
+            selectinload(Invoice.extracted_fields),
+            selectinload(Invoice.line_items),
+            selectinload(Invoice.vendor_matches),
+            selectinload(Invoice.processing_metrics)
+        )
+        .where(Invoice.id == invoice_uuid)
     )
     invoice = result.scalar_one_or_none()
     
