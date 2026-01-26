@@ -50,6 +50,7 @@ export const CostCodeClassifier: React.FC<CostCodeClassifierProps> = ({
     if (!confidence) return 'confidence-none';
     if (confidence >= 0.90) return 'confidence-high';
     if (confidence >= 0.80) return 'confidence-medium';
+    if (confidence >= 0.60) return 'confidence-okay';
     return 'confidence-low';
   };
 
@@ -57,6 +58,7 @@ export const CostCodeClassifier: React.FC<CostCodeClassifierProps> = ({
     if (!confidence) return 'N/A';
     if (confidence >= 0.90) return 'High';
     if (confidence >= 0.80) return 'Medium';
+    if (confidence >= 0.60) return 'confidence-okay';
     return 'Low - Review Required';
   };
 
