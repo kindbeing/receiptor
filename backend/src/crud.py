@@ -4,7 +4,6 @@ from uuid import UUID
 from datetime import datetime
 from models import Receipt, VendorMatch, Invoice, CorrectionHistory, ExtractedField
 from schemas import ReceiptCreate, ReceiptUpdate
-from database import get_db
 
 async def get_receipts(db: AsyncSession, skip: int = 0, limit: int = 100):
     result = await db.execute(select(Receipt).offset(skip).limit(limit))

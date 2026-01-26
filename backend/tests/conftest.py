@@ -9,7 +9,7 @@ os.environ["DATABASE_URL"] = "postgresql+asyncpg://root:password@localhost:5432/
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from database import Base, get_db
 from main import app
