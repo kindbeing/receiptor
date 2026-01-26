@@ -124,3 +124,44 @@ export interface VendorMatchResult {
   message: string;
 }
 
+export interface CorrectionHistory {
+  id: string;
+  field_name: string;
+  original_value: string | null;
+  corrected_value: string | null;
+  corrected_by?: string;
+  correction_type: string;
+  created_at: string;
+}
+
+export interface ReviewFormData {
+  vendor_name?: string;
+  invoice_number?: string;
+  invoice_date?: string;
+  total_amount?: number | string;
+  line_items?: LineItemResponse[];
+}
+
+export interface CorrectionRequest {
+  [field_name: string]: any;
+}
+
+export interface StatusUpdateResponse {
+  invoice_id: string;
+  status: InvoiceStatus;
+  updated_at: string;
+  message: string;
+}
+
+export interface CorrectionsResponse {
+  invoice_id: string;
+  corrections_saved: number;
+  corrections: Array<{
+    field_name: string;
+    original_value: string | null;
+    corrected_value: string | null;
+    created_at: string;
+  }>;
+  message: string;
+}
+

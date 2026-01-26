@@ -1,5 +1,14 @@
 // Invoice API Service
-import type { Invoice, InvoiceDetail, ExtractionResult, VendorMatchResult } from '../types/invoice';
+import type { 
+  Invoice, 
+  InvoiceDetail, 
+  ExtractionResult, 
+  VendorMatchResult,
+  StatusUpdateResponse,
+  CorrectionsResponse,
+  CorrectionRequest,
+  CorrectionHistory
+} from '../types/invoice';
 
 const API_BASE_URL = 'http://localhost:8000/api/invoices';
 
@@ -160,7 +169,70 @@ export const invoiceApi = {
 
     return response.json();
   },
+
+  /**
+   * Update invoice status (approve/reject/needs_review)
+   */
+  async updateInvoiceStatus(invoiceId: string, status: string): Promise<StatusUpdateResponse> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/status?status=${encodeURIComponent(status)}`, {
+      method: 'PATCH',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to update invoice status');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Save human corrections to extracted fields
+   */
+  async saveCorrections(invoiceId: string, corrections: CorrectionRequest): Promise<CorrectionsResponse> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/corrections`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(corrections),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to save corrections');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get correction history for an invoice
+   */
+  async getCorrections(invoiceId: string): Promise<{ invoice_id: string; corrections: CorrectionHistory[] }> {
+    const response = await fetch(`${API_BASE_URL}/${invoiceId}/corrections`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to get corrections');
+    }
+
+    return response.json();
+  },
 };
 
-export const { uploadInvoice, getInvoice, listInvoices, deleteInvoice, extractTraditional, extractVision, matchVendor, classifyCosts, getComparison } = invoiceApi;
+export const { 
+  uploadInvoice, 
+  getInvoice, 
+  listInvoices, 
+  deleteInvoice, 
+  extractTraditional, 
+  extractVision, 
+  matchVendor, 
+  classifyCosts, 
+  getComparison,
+  updateInvoiceStatus,
+  saveCorrections,
+  getCorrections
+} = invoiceApi;
 

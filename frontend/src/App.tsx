@@ -6,11 +6,12 @@ import { VisionAIProcessor } from './components/VisionAIProcessor'
 import { VendorMatcher } from './components/VendorMatcher'
 import { CostCodeClassifier } from './components/CostCodeClassifier'
 import { ComparisonDashboard } from './components/ComparisonDashboard'
+import { ReviewDashboard } from './components/ReviewDashboard'
 import type { Invoice, ExtractionResult } from './types/invoice'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'receipts' | 'invoices'>('invoices')
+  const [activeTab, setActiveTab] = useState<'receipts' | 'invoices' | 'review'>('invoices')
   const [uploadedInvoices, setUploadedInvoices] = useState<Invoice[]>([])
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
 
@@ -78,6 +79,12 @@ function App() {
             onClick={() => setActiveTab('invoices')}
           >
             📄 Invoices
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'review' ? 'active' : ''}`}
+            onClick={() => setActiveTab('review')}
+          >
+            📋 Review Queue
           </button>
           <button 
             className={`tab-btn ${activeTab === 'receipts' ? 'active' : ''}`}
@@ -155,6 +162,10 @@ function App() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'review' && (
+          <ReviewDashboard />
         )}
 
         {activeTab === 'receipts' && (

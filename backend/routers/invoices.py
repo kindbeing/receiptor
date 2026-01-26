@@ -14,6 +14,7 @@ from services.traditional_ocr_service import TraditionalOCRService
 from services.vendor_matching_service import VendorMatchingService, MatchCandidate
 from services.cost_code_service import cost_code_service
 from services.comparison_service import comparison_service
+from services.review_workflow_service import review_workflow_service
 from crud import create_vendor_match, update_invoice_status, get_invoice as crud_get_invoice
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
@@ -570,3 +571,138 @@ async def get_comparison(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Comparison failed: {str(e)}")
+
+
+@router.patch("/{invoice_id}/status")
+async def update_status(
+    invoice_id: str,
+    status: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update invoice status (approve/reject/needs_review).
+    
+    Args:
+        invoice_id: UUID of the invoice
+        status: New status (approved, rejected, needs_review)
+        db: Database session
+    
+    Returns:
+        Updated invoice data
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    try:
+        updated_invoice = await review_workflow_service.update_invoice_status(
+            invoice_id=invoice_uuid,
+            new_status=status,
+            db=db
+        )
+        
+        return {
+            "invoice_id": str(updated_invoice.id),
+            "status": updated_invoice.status,
+            "updated_at": updated_invoice.updated_at.isoformat(),
+            "message": f"Invoice status updated to '{status}'"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update status: {str(e)}")
+
+
+@router.post("/{invoice_id}/corrections")
+async def save_corrections(
+    invoice_id: str,
+    corrections: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Save human corrections to extracted fields.
+    
+    Args:
+        invoice_id: UUID of the invoice
+        corrections: Dict of field_name -> corrected_value
+        db: Database session
+    
+    Returns:
+        List of correction records created
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    try:
+        correction_records = await review_workflow_service.save_corrections(
+            invoice_id=invoice_uuid,
+            corrections=corrections,
+            db=db
+        )
+        
+        return {
+            "invoice_id": str(invoice_uuid),
+            "corrections_saved": len(correction_records),
+            "corrections": [
+                {
+                    "field_name": c.field_name,
+                    "original_value": c.original_value,
+                    "corrected_value": c.corrected_value,
+                    "created_at": c.created_at.isoformat()
+                }
+                for c in correction_records
+            ],
+            "message": f"Saved {len(correction_records)} correction(s)"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save corrections: {str(e)}")
+
+
+@router.get("/{invoice_id}/corrections")
+async def get_corrections(
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get correction history for an invoice.
+    
+    Args:
+        invoice_id: UUID of the invoice
+        db: Database session
+    
+    Returns:
+        List of correction records
+    """
+    try:
+        invoice_uuid = uuid.UUID(invoice_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invoice_id format")
+    
+    try:
+        corrections = await review_workflow_service.get_corrections_for_invoice(
+            invoice_id=invoice_uuid,
+            db=db
+        )
+        
+        return {
+            "invoice_id": str(invoice_uuid),
+            "corrections": [
+                {
+                    "id": str(c.id),
+                    "field_name": c.field_name,
+                    "original_value": c.original_value,
+                    "corrected_value": c.corrected_value,
+                    "corrected_by": c.corrected_by,
+                    "correction_type": c.correction_type,
+                    "created_at": c.created_at.isoformat()
+                }
+                for c in corrections
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get corrections: {str(e)}")
