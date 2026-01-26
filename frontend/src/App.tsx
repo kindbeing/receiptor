@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import ReceiptsTable from './components/ReceiptsTable'
 import InvoiceUploadForm from './components/InvoiceUploadForm'
 import { TraditionalOCRProcessor } from './components/TraditionalOCRProcessor'
 import { VisionAIProcessor } from './components/VisionAIProcessor'
@@ -11,7 +10,7 @@ import type { Invoice, ExtractionResult } from './types/invoice'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'receipts' | 'invoices' | 'review'>('invoices')
+  const [activeTab, setActiveTab] = useState<'invoices' | 'review'>('invoices')
   const [uploadedInvoices, setUploadedInvoices] = useState<Invoice[]>([])
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
 
@@ -85,12 +84,6 @@ function App() {
             onClick={() => setActiveTab('review')}
           >
             📋 Review Queue
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'receipts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('receipts')}
-          >
-            🧾 Receipts (Legacy)
           </button>
         </nav>
       </header>
@@ -168,9 +161,6 @@ function App() {
           <ReviewDashboard />
         )}
 
-        {activeTab === 'receipts' && (
-          <ReceiptsTable />
-        )}
       </main>
     </div>
   )
