@@ -1,10 +1,10 @@
 # Domain-Driven Design: Invoice Automation System
 
 ## Core Domain Problem
-BuilderTrend needs to automate subcontractor invoice processing to drive payment feature adoption and revenue. Invoice formats vary wildly across small contracting businesses, requiring robust extraction and classification.
+BuilderCo needs to automate subcontractor invoice processing to drive payment feature adoption and revenue. Invoice formats vary wildly across small contracting businesses, requiring robust extraction and classification.
 
 ## Demo Strategy: Evolution Comparison
-Show BuilderTrend three approaches to prove technical depth and business thinking:
+Show BuilderCo three approaches to prove technical depth and business thinking:
 1. **Traditional OCR (Baseline)** - Shows understanding of legacy systems
 2. **Vision-Native AI (Modern)** - Shows state-of-the-art capabilities
 3. **Full Pipeline** - Shows production-ready system design
@@ -82,7 +82,7 @@ Show BuilderTrend three approaches to prove technical depth and business thinkin
 ## Anti-Corruption Layer
 - Local OCR engines (Tesseract, PaddleOCR)
 - Local LLMs via Ollama (Qwen2-VL, Llama)
-- Legacy BuilderTrend "Bills" feature integration points
+- Legacy BuilderCo "Bills" feature integration points
 
 ## Value Proposition
 - Reduce manual data entry time by 80%+

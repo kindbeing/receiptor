@@ -15,7 +15,7 @@ INSERT INTO subcontractors (id, name, builder_id, contact_info) VALUES
     ('10000000-0000-0000-0000-000000000007', 'Elite Painting Co', '00000000-0000-0000-0000-000000000001', '{"phone": "555-0107", "email": "elite@painting.com"}'),
     ('10000000-0000-0000-0000-000000000008', 'Martinez Concrete Works', '00000000-0000-0000-0000-000000000001', '{"phone": "555-0108", "email": "concrete@martinez.com"}');
 
--- Insert test cost codes (BuilderTrend standard + custom)
+-- Insert test cost codes (BuilderCo standard + custom)
 -- NOTE: Lines 17-22 demonstrate semantic similarity - comment them out during demo to show low confidence matching
 INSERT INTO cost_codes (id, code, label, description, builder_id) VALUES
     -- Plumbing

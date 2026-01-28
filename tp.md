@@ -1,8 +1,8 @@
-# Technical Alternatives & Improvements for Invoice Automation
+# Technical Progressions & Improvements for Invoice Automation
 
 > **Priority**: Reliability > Accuracy > Efficiency > Cost  
 > **Date**: 2026-01-26  
-> **Context**: BuilderTrend interview demo - proving production readiness
+> **Context**: BuilderCo interview demo - proving production readiness
 
 ---
 
@@ -21,14 +21,14 @@
 - **Reliability**: OCR fails on 30% of invoices (poor quality), Vision handles 95%+
 - **Test results**: ABC Plumbing 100% confidence, Johnson HVAC 95% (poor quality scan)
 
-### Alternatives
+### Progressions
 
 #### A. Commercial Document AI APIs
 - **AWS Textract**: 2-3s/page, 95%+ accuracy, $1.50/1000 pages, SLA 99.9%
 - **Azure Document Intelligence**: 2-4s/page, 98%+ accuracy, $1.00/1000 pages, custom model training
 - **Google Document AI**: 3-5s/page, 97%+ accuracy, $1.50/1000 pages, AutoML support
 - **Pros**: Production SLAs, managed infrastructure, proven at scale (millions of docs/day), no GPU management
-- **Cons**: Vendor lock-in, $1500-1800/month at 10K invoices, data privacy concerns (BuilderTrend's customer data), network latency
+- **Cons**: Vendor lock-in, $1500-1800/month at 10K invoices, data privacy concerns (BuilderCo's customer data), network latency
 
 #### B. Smaller/Faster Vision Models
 - **llama3.2-vision:11b**: 15s/invoice tested, 90% accuracy (needs validation on your test set)
@@ -40,7 +40,7 @@
 #### C. Fine-Tuned Document Models
 - **Donut**: Transformer for document understanding, 89% accuracy on cord-v2 benchmark
 - **LayoutLMv3**: Reads layout + text, 96.4% on RVL-CDIP, requires fine-tuning on invoices
-- **Pros**: Can fine-tune on BuilderTrend's invoice formats, potentially higher accuracy on specific layouts
+- **Pros**: Can fine-tune on BuilderCo's invoice formats, potentially higher accuracy on specific layouts
 - **Cons**: Requires labeled training data (1000+ invoices), 2-4 weeks training time, model maintenance overhead
 
 #### D. Multi-Model Ensemble (3 models vote)
@@ -72,7 +72,7 @@
 - Confidence scoring from models
 - **Weakness**: Two wrong answers can agree with high confidence, no external validation
 
-### Alternatives
+### Progressions
 
 #### A. Ground Truth Testing Framework
 - Test extraction against `/receipts/expected.md` (5 invoices with known correct values)
@@ -131,7 +131,7 @@
 - **Performance**: <1ms per comparison, scales to 10K vendors
 - **Accuracy**: Good on exact/close matches (95%+ success), struggles with structural differences (e.g., "Corp" vs "Corporation" vs "Co")
 
-### Alternatives
+### Progressions
 
 #### A. Semantic Similarity (Sentence-BERT embeddings)
 - Encode vendor names with all-MiniLM-L6-v2 (same model as cost codes)
@@ -193,7 +193,7 @@
 - Caching for performance (50ms for 100 items, <5ms for single item)
 - **Accuracy**: Good on clear items ("Install fixtures" → 95% confidence), struggles with generic ("Labor" → 42% confidence)
 
-### Alternatives
+### Progressions
 
 #### A. Larger Embedding Models
 - **BGE-small-en-v1.5**: 33M params, better retrieval accuracy (+3-5% on BEIR benchmark), 120MB, 80ms/100 items
@@ -260,7 +260,7 @@ Combined: 76%+ accuracy on previously ambiguous items.
 - No cost optimization (could run cheaper methods first for known-good vendors)
 - **Performance**: 70% of invoices use OCR (fast), 30% use Vision (slow)
 
-### Alternatives
+### Progressions
 
 #### A. Template Learning (Vendor-specific routing)
 - After 10 invoices from same vendor, detect if format is consistent
